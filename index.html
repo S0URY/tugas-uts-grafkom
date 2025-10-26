@@ -2,59 +2,98 @@
 <html lang="en">
 <head>
   <meta charset="utf-8"/>
-  <title>Dolliv – Pure WebGL Primitives</title>
+  <title>Olive Evolution Viewer</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <style>
-    html,body{margin:0;height:100%;background:#f6f7fb;color:#222;font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial}
-    #wrap{display:grid;grid-template-rows:auto 1fr}
-    header{padding:8px 12px;background:#10131a;color:#e9eefc;display:flex;gap:14px;align-items:center}
-    header b{font-weight:600}
-    #c{width:100%;height:100%;display:block;cursor:grab}
-    #c:active{cursor:grabbing}
-    .hint{opacity:.7;font-size:12px}
+    html,body{
+      margin:0;
+      height:100%;
+      background:#f6f7fb;
+      color:#222;
+      font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial;
+    }
+    #wrap{
+      display:grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      grid-auto-rows: 1fr;
+      height:100vh;
+      gap:4px;
+      padding:4px;
+      box-sizing:border-box;
+    }
+    canvas{
+      width:100%;
+      height:100%;
+      display:block;
+      background:#eaeef8;
+      cursor:grab;
+    }
+    canvas:active{cursor:grabbing;}
+    .label{
+      position:absolute;
+      background:rgba(0,0,0,0.6);
+      color:white;
+      font-size:14px;
+      padding:4px 8px;
+      border-radius:6px;
+    }
   </style>
 </head>
 <body>
-<div id="wrap">
+  <div id="wrap">
+    <div style="position:relative">
+      <canvas id="c-smoliv"></canvas>
+      <div class="label">Smoliv</div>
+    </div>
+    <div style="position:relative">
+      <canvas id="c-dolliv"></canvas>
+      <div class="label">Dolliv</div>
+    </div>
+    <div style="position:relative">
+      <canvas id="c-arboliva"></canvas>
+      <div class="label">Arboliva</div>
+    </div>
+  </div>
+
+  <!-- shader khusus Dolliv -->
+  <script id="vs" type="x-shader/x-vertex">
+  precision mediump float;
+  attribute vec3 aPos;
+  attribute vec3 aNor;
+  uniform mat4 uProj, uView, uModel;
+  uniform mat3 uNormal;
+  uniform vec3 uColor;
+  varying vec3 vColor;
+  varying vec3 vNormal;
+  varying vec3 vPos;
+  void main(){
+    vec4 wp = uModel * vec4(aPos,1.0);
+    gl_Position = uProj * uView * wp;
+    vPos = (uView * wp).xyz;
+    vNormal = normalize(uNormal * aNor);
+    vColor = uColor;
+  }
+  </script>
+
+  <script id="fs" type="x-shader/x-fragment">
+  precision mediump float;
+  varying vec3 vColor;
+  varying vec3 vNormal;
+  varying vec3 vPos;
+  uniform vec3 uLightDir;
+  void main(){
+    float ndl = max(dot(normalize(vNormal), normalize(-uLightDir)), 0.0);
+    float amb = 0.35;
+    vec3 col = vColor * (amb + 0.75*ndl);
+    gl_FragColor = vec4(col, 1.0);
+  }
+  </script>
+
   <canvas id="c"></canvas>
-</div>
+  <script src="smoliv.js"></script>
+  <script src="dolliv.js"></script>
+  <script src="arboliva.js"></script>
+  <script src="gabungdisplay.js"></script>
 
-<!-- Vertex shader -->
-<script id="vs" type="x-shader/x-vertex">
-precision mediump float;
-attribute vec3 aPos;
-attribute vec3 aNor;
-uniform mat4 uProj, uView, uModel;
-uniform mat3 uNormal;
-uniform vec3 uColor;
-varying vec3 vColor;
-varying vec3 vNormal;
-varying vec3 vPos;
-void main(){
-  vec4 wp = uModel * vec4(aPos,1.0);
-  gl_Position = uProj * uView * wp;
-  vPos = (uView * wp).xyz;
-  vNormal = normalize(uNormal * aNor);
-  vColor = uColor;
-}
-</script>
-
-<!-- Fragment shader -->
-<script id="fs" type="x-shader/x-fragment">
-precision mediump float;
-varying vec3 vColor;
-varying vec3 vNormal;
-varying vec3 vPos;
-uniform vec3 uLightDir;   // in view space, normalized
-void main(){
-  // simple lambert + soft ambient
-  float ndl = max(dot(normalize(vNormal), normalize(-uLightDir)), 0.0);
-  float amb = 0.35;
-  vec3 col = vColor * (amb + 0.75*ndl);
-  gl_FragColor = vec4(col, 1.0);
-}
-</script>
-
-<script src="dolliv.js"></script>
 </body>
 </html>
