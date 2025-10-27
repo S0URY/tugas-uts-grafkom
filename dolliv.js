@@ -257,6 +257,7 @@
   
     // Node list; transform order = T * Rz * Ry * Rx * S
     const NODES = [
+      {id:'Torso', prim:'cone', parent:null,  S:[0.4,1.1,0.4], R:[0,0,0], T:[0,0.15,0], color:C.leaf},
       {id:'H', prim:'sphere', parent:null,   S:[0.95,1.10,0.85], R:[0,0,0], T:[0,1.6,0], color:C.pale},
       {id:'OB_L', prim:'sphere', parent:'H', S:[1.0,0.55,0.65], R:[0,0,0], T:[-1.1,0.70,0], color:C.olive},
       {id:'OB_R', prim:'sphere', parent:'H', S:[1.0,0.55,0.65], R:[0,0,0], T:[ 1.1,0.70,0], color:C.olive},
@@ -268,28 +269,27 @@
       {id:'Fringe_L', prim:'cone', parent:'H', S:[0.65,0.18,0.25], R:[0,0, 30*Math.PI/180], T:[-0.45,0.9,0.30], color:C.leaf},
       {id:'Fringe_R', prim:'cone', parent:'H', S:[0.65,0.18,0.25], R:[0,0,-30*Math.PI/180], T:[ 0.45,0.9,0.30], color:C.leaf},
   
-      {id:'Collar_L', prim:'cone', parent:null, S:[0.55,0.15,0.30], R:[Math.PI,0.5,-25*Math.PI/180], T:[-0.35,0.5,0.16], color:C.leaf},
-      {id:'Collar_R', prim:'cone', parent:null, S:[0.55,0.15,0.30], R:[Math.PI,-0.5,25*Math.PI/180], T:[ 0.35,0.5,0.16], color:C.leaf},
-      {id:'Collar_L2', prim:'cone', parent:null, S:[0.55,0.15,0.30], R:[Math.PI,-0.5,-25*Math.PI/180], T:[-0.35,0.5,-0.16], color:C.leaf},
-      {id:'Collar_R2', prim:'cone', parent:null, S:[0.55,0.15,0.30], R:[Math.PI,0.5,25*Math.PI/180], T:[ 0.35,0.5,-0.16], color:C.leaf},
+      {id:'Collar_L',  prim:'cone', parent:'Torso', S:[0.85,0.15,0.30], R:[Math.PI,0.5,-10*Math.PI/180], T:[-0.775,0.3,0.4], color:C.leaf},
+      {id:'Collar_R',  prim:'cone', parent:'Torso', S:[0.85,0.15,0.30], R:[Math.PI,-0.5,10*Math.PI/180], T:[ 0.775,0.3,0.4], color:C.leaf},
+      {id:'Collar_L2', prim:'cone', parent:'Torso', S:[0.85,0.15,0.30], R:[Math.PI,-0.5,-10*Math.PI/180], T:[-0.775,0.3,-0.4], color:C.leaf},
+      {id:'Collar_R2', prim:'cone', parent:'Torso', S:[0.85,0.15,0.30], R:[Math.PI,0.5,10*Math.PI/180], T:[ 0.775,0.3,-0.4], color:C.leaf},
+
   
-      {id:'Torso', prim:'cone', parent:null,  S:[0.6,1.40,0.6], R:[0,0,0], T:[0,0.15,0], color:C.leaf},
   
       {id:'Arm_L', prim:'cone', parent:'Torso', S:[0.18,0.70,0.18], R:[0,0, 130*Math.PI/180], T:[-0.95,-0.2,0], color:C.leaf},
       {id:'Arm_R', prim:'cone', parent:'Torso', S:[0.18,0.70,0.18], R:[0,0,-130*Math.PI/180], T:[ 0.95,-0.2,0], color:C.leaf},
   
-      // // skirt petals around Y
-      // {id:'Skirt_A', prim:'cone', parent:'Torso', S:[0.60,0.90,0.20], R:[0,0,0],              T:[0, -0.45, 0.75], color:C.leaf},
-      // {id:'Skirt_B', prim:'cone', parent:'Torso', S:[0.60,0.90,0.20], R:[0,72*Math.PI/180,0], T:[0.71,-0.45,0.50], color:C.leaf},
-      // {id:'Skirt_C', prim:'cone', parent:'Torso', S:[0.60,0.90,0.20], R:[0,144*Math.PI/180,0],T:[0.95,-0.45,0],    color:C.leaf},
+      // skirt petals around Y
+      {id:'Skirt_A', prim:'cone', parent:'Torso', S:[0.60,0.40,0.23], R:[Math.PI-0.4,-45*Math.PI/180,0], T:[-0.65, -1.34, 0.59], color:C.leaf},
+      {id:'Skirt_B', prim:'cone', parent:'Torso', S:[0.60,0.40,0.23], R:[Math.PI-0.4,45*Math.PI/180,0], T:[0.65,-1.34,0.59], color:C.leaf},
+      // {id:'Skirt_C', prim:'cone', parent:'Torso', S:[0.60,0.90,0.23], R:[Math.PI,90*Math.PI/180,0],T:[0.65,-1.34,0],    color:C.leaf},
       // {id:'Skirt_D', prim:'cone', parent:'Torso', S:[0.60,0.90,0.20], R:[0,216*Math.PI/180,0],T:[0.71,-0.45,-0.50], color:C.leaf},
       // {id:'Skirt_E', prim:'cone', parent:'Torso', S:[0.60,0.90,0.20], R:[0,288*Math.PI/180,0],T:[0,-0.45,-0.75],    color:C.leaf},
-  
       // {id:'InnerPetal_L', prim:'cone', parent:'Torso', S:[0.28,0.65,0.12], R:[0, 25*Math.PI/180,0], T:[-0.22,-0.55,0.35], color:C.lilac},
       // {id:'InnerPetal_R', prim:'cone', parent:'Torso', S:[0.28,0.65,0.12], R:[0,-25*Math.PI/180,0], T:[ 0.22,-0.55,0.35], color:C.lilac},
   
-      {id:'LegR', prim:'cone', parent:'Torso', S:[0.22,0.85,0.22], R:[0,0,Math.PI], T:[-0.3,-0.95,0.05], color:C.pale},
-      {id:'LegL', prim:'cone', parent:'Torso', S:[0.22,0.85,0.22], R:[0,0,Math.PI], T:[0.3,-0.95,0.05], color:C.pale},
+      {id:'LegR', prim:'cone', parent:'Torso', S:[0.22,0.55,0.22], R:[0,0,Math.PI], T:[-0.3,-1.25,0.05], color:C.pale},
+      {id:'LegL', prim:'cone', parent:'Torso', S:[0.22,0.55,0.22], R:[0,0,Math.PI], T:[0.3,-1.25,0.05], color:C.pale},
   
       // face (tiny spheres / box for mouth)
       {id:'Eye_L', prim:'sphere', parent:'H', S:[0.08,0.08,0.08], R:[0,0,0], T:[-0.35,-0.3,0.90], color:C.black},
@@ -340,40 +340,82 @@
     });
   
     // ---------- Draw ----------
-    gl.enable(gl.DEPTH_TEST);
-    gl.clearColor(0.965,0.972,0.985,1);
-  
-    function render(){
-      resize();
-      gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
-  
-      const V = viewMat();
-      const P = projMat();
-      gl.uniformMatrix4fv(loc.uView,false,new Float32Array(V));
-      gl.uniformMatrix4fv(loc.uProj,false,new Float32Array(P));
-      gl.uniform3fv(loc.uLightDir,new Float32Array([0.5,0.9,0.4])); // view-space dir
-  
-      for(const n of NODES){
-        const mesh = MESH[n.prim];
-        gl.bindBuffer(gl.ARRAY_BUFFER, mesh.vao);
-        gl.vertexAttribPointer(loc.aPos,3,gl.FLOAT,false,0,0);
-        gl.bindBuffer(gl.ARRAY_BUFFER, mesh.nbo);
-        gl.vertexAttribPointer(loc.aNor,3,gl.FLOAT,false,0,0);
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, mesh.ibo);
-  
-        const MW = worldMatrixOf(n);
-        gl.uniformMatrix4fv(loc.uModel,false,new Float32Array(MW));
-  
-        // normal matrix = inverse(transpose(mat3(V*M)))
-        const VM = M.mul(V, MW);
-        const N3 = M.transposeMat3(M.invertMat3(M.toMat3(VM)));
-        gl.uniformMatrix3fv(loc.uNormal,false,new Float32Array(N3));
-  
-        gl.uniform3fv(loc.uColor,new Float32Array(n.color));
-        gl.drawElements(gl.TRIANGLES, mesh.count, gl.UNSIGNED_SHORT, 0);
+      gl.enable(gl.DEPTH_TEST);
+      gl.clearColor(0.965,0.972,0.985,1);
+
+      function render(time){
+        resize();
+        gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+
+        const t = time * 0.001; // seconds
+        const V = viewMat();
+        const P = projMat();
+        gl.uniformMatrix4fv(loc.uView,false,new Float32Array(V));
+        gl.uniformMatrix4fv(loc.uProj,false,new Float32Array(P));
+        gl.uniform3fv(loc.uLightDir,new Float32Array([0.5,0.9,0.4]));
+
+        // ---------- Animation logic ----------
+        const moveZ = Math.sin(t) * 0.5;
+        for (const n of NODES) {
+          if (!n._baseT) n._baseT = [...n.T];
+          if (!n._baseR) n._baseR = [...n.R];
+          if (!n._baseS) n._baseS = [...n.S];
+        }
+        // Whole model hop
+        const hopHeight = Math.abs(Math.sin(t * 3)) * 0.5;
+        for (const n of NODES) {
+          if (!n._baseT) n._baseT = [...n.T];
+          if (!n.parent) {
+            n.T[1] = n._baseT[1] + hopHeight;
+          }
+        }
+
+        // legs walking (swing)
+        const legSwing = Math.sin(t * 5) * 0.5;
+        map["LegL"].R[0] = map["LegL"]._baseR[0] + legSwing;
+        map["LegR"].R[0] = map["LegR"]._baseR[0] - legSwing;
+
+        // eyes pulsating (scaling)
+        const eyeScale = 1 + 0.2 * Math.sin(t * 6);
+        for (const eyeId of ["Eye_L", "Eye_R"]) {
+          const e = map[eyeId];
+          if (e) {
+            if (!e._baseS) e._baseS = [...e.S];
+            e.S[0] = e._baseS[0] * eyeScale;
+            e.S[1] = e._baseS[1] * eyeScale;
+            e.S[2] = e._baseS[2] * eyeScale;
+          }
+        }
+
+        // head hierarchical movement (nod)
+        const head = map["H"];
+        if (head) {
+          if (!head._baseR) head._baseR = [...head.R];
+          head.R[0] = head._baseR[0] + Math.sin(t * 2) * 0.2;
+        }
+        for (const n of NODES) {
+          const mesh = MESH[n.prim];
+          gl.bindBuffer(gl.ARRAY_BUFFER, mesh.vao);
+          gl.vertexAttribPointer(loc.aPos, 3, gl.FLOAT, false, 0, 0);
+          gl.bindBuffer(gl.ARRAY_BUFFER, mesh.nbo);
+          gl.vertexAttribPointer(loc.aNor, 3, gl.FLOAT, false, 0, 0);
+          gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, mesh.ibo);
+
+          const MW = worldMatrixOf(n);
+          gl.uniformMatrix4fv(loc.uModel, false, new Float32Array(MW));
+
+          const VM = M.mul(V, MW);
+          const N3 = M.transposeMat3(M.invertMat3(M.toMat3(VM)));
+          gl.uniformMatrix3fv(loc.uNormal, false, new Float32Array(N3));
+
+          gl.uniform3fv(loc.uColor, new Float32Array(n.color));
+          gl.drawElements(gl.TRIANGLES, mesh.count, gl.UNSIGNED_SHORT, 0);
+        }
+
+        // keep looping
+        requestAnimationFrame(render);
       }
+
+      // start animation loop once
       requestAnimationFrame(render);
-    }
-    render();
-  })();
-  
+})();
