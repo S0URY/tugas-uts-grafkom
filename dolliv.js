@@ -405,7 +405,6 @@
           const nodAngle = Math.sin(t * 2) * 0.2;    // up/down nod
           const turnAngle = Math.sin(t * 1.5) * 0.5; // left/right turn
 
-          // --- Matrices ---
           const nod = M.Rx(nodAngle);             // nod
           const turn = M.RAxis([0,1,0], turnAngle); // turn around Y
           const baseR = M.mul(
@@ -413,7 +412,6 @@
               M.Rx(head._baseR[0])
           );
 
-          // --- Combine: base * turn * nod ---
           head._customR = M.mul(baseR, M.mul(turn, nod));
         }
         for (const n of NODES) {
