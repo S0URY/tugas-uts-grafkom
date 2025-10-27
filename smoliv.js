@@ -11,10 +11,165 @@ if(typeof mat4 === 'undefined'){
       {pos: [0.00, 0.02, -0.13], rot: [0, 0,0,1], scale: [0.85,1.13,1.1]}
     ],
     feet: [
-      {pos: [-0.085, -0.36, -0.005], rot: [0,0,-1,0], scale: [1,1,1]},
-      {pos: [0.085, -0.36, -0.005], rot: [0,0,1,0], scale: [1,1,1]}
-    ]
-  };
+    {pos: [-0.085, -0.36, -0.005], rot: [0,0,-1,0], scale: [1,1,1]},
+    {pos: [0.085, -0.36, -0.005], rot: [0,0,1,0], scale: [1,1,1]}
+  ]
+};
+window.SmolivNodes = SmolivNodes;
+// === Hierarchical animation & drawing helpers ===
+// (paste this after `window.SmolivNodes = SmolivNodes;`)
+(function(){
+  // small helper: compose axis-angle stored in a few forms into [axisX,axisY,axisZ,angle]
+  function parseRot(rot){
+    if(!rot) return null;
+    if(rot.length === 4){
+      // stored as [ax, ay, az, angle]
+      return {axis: [rot[0], rot[1], rot[2]], angle: rot[3]};
+    } else if(rot.length >= 3){
+      // stored as vector whose magnitude = angle, direction = axis
+      const ang = Math.hypot(rot[0], rot[1], rot[2]);
+      if(ang < 1e-6) return null;
+      return {axis: [rot[0]/ang, rot[1]/ang, rot[2]/ang], angle: ang};
+    }
+    return null;
+  }
+
+  // Compose two axis-angle rotations approximately by converting to matrix multiply:
+  function applyAxisAngleToMat(mat, rot){
+    if(!rot) return;
+    mat4.rotate(mat, mat, rot.angle, rot.axis);
+  }
+
+  // updateAnim: produce the same "versi lama penuh" cycle (walk → jump → squash → turn → jump)
+  let _animStart = performance.now();
+  function updateAnim(time){
+    const t = (time - _animStart) / 1000;
+    const cycle = t % 10.0;
+    const N = window.SmolivNodes;
+    if(!N) return;
+
+    // Reset root baseline
+    N.root.pos[0] = 0; N.root.pos[1] = 0; N.root.pos[2] = 0;
+    N.root.scale = [1,1,1];
+    // use rot stored as [ax,ay,az,angle] for root to be consistent
+    N.root.rot = N.root.rot && N.root.rot.length===4 ? N.root.rot : [0,1,0,0];
+
+    const walkOsc = Math.sin(t * 6.0) * 0.05;
+
+    if (cycle < 3.0) {
+      const p = cycle / 3.0;
+      const ease = 0.5 - 0.5 * Math.cos(Math.PI * p);
+      N.root.pos[0] = 0.6 * ease;
+      // feet vertical offset
+      N.feet[0].pos[1] = -0.36 + walkOsc;
+      N.feet[1].pos[1] = -0.36 - walkOsc;
+      // subtle body bob
+      N.body.pos[1] = -0.06 + Math.sin(t*12.0)*0.005;
+    } else if (cycle < 4.0) {
+      const p = (cycle - 3.0);
+      const y = Math.sin(p * Math.PI) * 0.5;
+      const s = 1.0 + Math.sin(p * Math.PI) * 0.3;
+      N.root.pos[0] = 0.6;
+      N.root.pos[1] = y;
+      N.root.scale = [1/Math.sqrt(s), s, 1/Math.sqrt(s)];
+    } else if (cycle < 5.0) {
+      const p = (cycle - 4.0);
+      const squash = 1.0 + Math.sin(p * Math.PI) * 0.4;
+      N.root.pos = [0.6, 0, 0];
+      N.root.scale = [squash, 1/squash, squash];
+    } else if (cycle < 8.0) {
+      const p = (cycle - 5.0) / 3.0;
+      const ang = Math.PI * p;
+      // root.rot stored [ax,ay,az,angle]
+      N.root.rot = [0,1,0,ang];
+      // walk back
+      const ease = 0.5 - 0.5 * Math.cos(Math.PI * p);
+      N.root.pos[0] = 0.6 * (1.0 - ease);
+      N.feet[0].pos[1] = -0.36 + walkOsc;
+      N.feet[1].pos[1] = -0.36 - walkOsc;
+    } else {
+      const p = (cycle - 8.0) / 2.0;
+      const y = Math.sin(p * Math.PI) * 0.5;
+      const s = 1.0 + Math.sin(p * Math.PI) * 0.3;
+      N.root.pos[1] = y;
+      N.root.scale = [1/Math.sqrt(s), s, 1/Math.sqrt(s)];
+    }
+    // keep small per-leaf wiggle so they feel attached
+    for(let i=0;i<N.leaves.length;i++){
+      const f = 0.06 * Math.sin(t*3.0 + i*1.3);
+      N.leaves[i].pos[0] += f * (i%2?1:-1);
+      N.leaves[i].pos[2] += f * 0.3;
+    }
+  }
+
+  // updateHierarchy: compute world matrix for each node (root -> body -> fruit -> leaves, feet, face)
+  function updateHierarchy(time){
+    if(!window.SmolivNodes) return;
+    updateAnim(time);
+    const N = window.SmolivNodes;
+
+    // root mat
+    const rootMat = mat4.create();
+    mat4.translate(rootMat, rootMat, N.root.pos);
+    // apply root rotation; root.rot stored as [ax,ay,az,angle] preferably
+    const r = parseRot(N.root.rot || [0,1,0,0]);
+    if(r) applyAxisAngleToMat(rootMat, r);
+    mat4.scale(rootMat, rootMat, N.root.scale);
+    N.root._world = rootMat;
+
+    // body = child of root: translate by body.pos relative to root
+    const bodyMat = mat4.create(); mat4.copy(bodyMat, rootMat);
+    mat4.translate(bodyMat, bodyMat, N.body.pos);
+    const br = parseRot(N.body.rot);
+    if(br) applyAxisAngleToMat(bodyMat, br);
+    mat4.scale(bodyMat, bodyMat, N.body.scale);
+    N.body._world = bodyMat;
+
+    // fruit: child of root (position relative to root)
+    const fruitMat = mat4.create(); mat4.copy(fruitMat, rootMat);
+    mat4.translate(fruitMat, fruitMat, N.fruit.pos);
+    const fr = parseRot(N.fruit.rot);
+    if(fr) applyAxisAngleToMat(fruitMat, fr);
+    mat4.scale(fruitMat, fruitMat, N.fruit.scale);
+    N.fruit._world = fruitMat;
+
+    // leaves: child of fruit (use leaf.pos, leaf.rot, leaf.scale)
+    N.leaves.forEach((leaf, i) => {
+      const m = mat4.create(); mat4.copy(m, fruitMat);
+      mat4.translate(m, m, leaf.pos);
+      const lr = parseRot(leaf.rot);
+      if(lr) applyAxisAngleToMat(m, lr);
+      mat4.scale(m, m, leaf.scale);
+      leaf._world = m;
+    });
+
+    // feet: child of root
+    N.feet.forEach((f,i) => {
+      const m = mat4.create(); mat4.copy(m, rootMat);
+      mat4.translate(m, m, f.pos);
+      const frt = parseRot(f.rot);
+      if(frt) applyAxisAngleToMat(m, frt);
+      mat4.scale(m, m, f.scale);
+      f._world = m;
+    });
+
+    // face (eyes/mouth) positions: create ready-to-use small world mats
+    // eyes positions used in drawScene; derive them by translating bodyMat
+    const eyeL = mat4.create(); mat4.copy(eyeL, bodyMat); mat4.translate(eyeL, eyeL, [-0.045, -0.04, 0.155]); N._eyeL = eyeL;
+    const eyeR = mat4.create(); mat4.copy(eyeR, bodyMat); mat4.translate(eyeR, eyeR, [ 0.045, -0.04, 0.155]); N._eyeR = eyeR;
+    const eyeWhiteOffset = [0,0,0.04];
+    const eyeWL = mat4.create(); mat4.copy(eyeWL, eyeL); mat4.translate(eyeWL, eyeWL, eyeWhiteOffset); N._eyeWL = eyeWL;
+    const eyeWR = mat4.create(); mat4.copy(eyeWR, eyeR); mat4.translate(eyeWR, eyeWR, eyeWhiteOffset); N._eyeWR = eyeWR;
+
+    // mouth positions (a few small bumps) anchored to bodyMat
+    N._mouthBase = mat4.create(); mat4.copy(N._mouthBase, bodyMat); mat4.translate(N._mouthBase, N._mouthBase, [0, -0.14, 0.175]);
+  }
+
+  // expose global function so render loop can call it
+  window.updateHierarchy = updateHierarchy;
+})();
+
+
 
     function create(){ return new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]); }
     function copy(out,a){ for(let i=0;i<16;i++) out[i]=a[i]; return out; }
@@ -515,35 +670,114 @@ function createVAOFromMesh(gl,program,mesh){
 
   // Draw the scene objects (body, fruit, leaves, feet, face)
   function drawScene(){
-  drawMesh(bodyVAO, [0.00, -0.06, 0.00], null, [0.74,0.96,0.46], 0, 0, [0.92,0.65,0.92]);
+      // === Tambahan agar drawScene pakai animasi SmolivNodes ===
+  const N = window.SmolivNodes;
+  if (!N) return; // kalau belum siap, jangan gambar dulu
+
+  const root = N.root;
+  const feet = N.feet;
+  const fruit = N.fruit;
+  const leaves = N.leaves;
+
+  drawMesh(bodyVAO, [root.pos[0] + 0.00, root.pos[1] - 0.06, root.pos[2]], root.rot, [0.74,0.96,0.46], 0, 0, root.scale);
   drawMesh(bodyCapVAO, [0.00, 0.14, 0.00], null, [0.74,0.96,0.46], 0, 0, [1.50,0.72,1.50]);
-  drawMesh(fruitVAO, [0.00, 0.26, 0.00], null, [0.96,0.92,0.46], 0, 0, [0.58,0.58,0.58]);
+  drawMesh(
+  fruitVAO,
+  [root.pos[0] + 0.00, root.pos[1] + 0.26, root.pos[2] + 0.00],
+  root.rot,
+  [0.96,0.92,0.46],
+  0, 0,
+  root.scale
+);
   // Leaves: place in five spots to match screenshot: left-top, left-bottom, right-bottom, right-top (near fruit) and a forehead droplet
-  drawMesh(leafVAO, [-0.12, 0.30, -0.02], [-0.85, 0.55, 0.10], [0.15,0.83,0.35], 0, 0, [0.78,0.78,0.78]);
-  drawMesh(leafVAO, [-0.06, 0.24, 0.03], [-0.40, 0.35, 0.08], [0.15,0.78,0.33], 0, 0, [0.62,0.62,0.62]);
-  drawMesh(leafVAO, [0.06, 0.24, 0.03], [0.40, -0.35, -0.08], [0.15,0.78,0.33], 0, 0, [0.62,0.62,0.62]);
-  drawMesh(leafVAO, [0.4, 0.30, 0.03], [-0.45, -1, -1], [0.15,0.83,0.35], 0, 0, [0.78,0.78,0.78]);
-  drawMesh(leafVAO, [0.00, 0.17, 0.20], [-0.10, 0.10, 0.00], [0.14,0.72,0.20], 0, 0, [0.20,0.30,0.40]);
+drawMesh(leafVAO, [root.pos[0]-0.12, root.pos[1]+0.30, root.pos[2]-0.02], [-0.85, 0.55, 0.10], [0.15,0.83,0.35], 0, 0, [0.78,0.78,0.78]);
+drawMesh(leafVAO, [root.pos[0]-0.06, root.pos[1]+0.24, root.pos[2]+0.03], [-0.40, 0.35, 0.08], [0.15,0.78,0.33], 0, 0, [0.62,0.62,0.62]);
+drawMesh(leafVAO, [root.pos[0]+0.06, root.pos[1]+0.24, root.pos[2]+0.03], [0.40, -0.35, -0.08], [0.15,0.78,0.33], 0, 0, [0.62,0.62,0.62]);
+drawMesh(leafVAO, [root.pos[0]+0.12, root.pos[1]+0.30, root.pos[2]-0.02], [0.85, -0.55, -0.10], [0.15,0.83,0.35], 0, 0, [0.78,0.78,0.78]);
+drawMesh(leafVAO, [root.pos[0]+0.00, root.pos[1]+0.25, root.pos[2]+0.10], [-0.10, 0.10, 0.00], [0.14,0.72,0.20], 0, 0, [0.50,0.50,0.50]);
   // Feet: inverted cones (apex pointing down).
-  drawMesh(footVAO, [-0.085, -0.36, -0.005], [0,0,-0.35], [0.74,0.86,0.46], 0, 0, [0.80,0.80,0.80]);
-  drawMesh(footVAO, [0.085, -0.36, -0.005], [0,0,0.35], [0.74,0.86,0.46], 0, 0, [0.80,0.80,0.80]);
+  drawMesh(footVAO, feet[0].pos, feet[0].rot, [0.28,0.48,0.26], 0, 0, [0.80,0.80,0.80]);
+  drawMesh(footVAO, feet[1].pos, feet[1].rot, [0.28,0.48,0.26], 0, 0, [0.80,0.80,0.80]);
+
   // Eyes: draw the black pupil, then increase the white highlight size and move it slightly backward
-  drawMesh(eyeVAO, [-0.045, -0.10, 0.155], null, [0.04,0.04,0.04], 0, 0, [1.20,1.20,1.20]);
+  drawMesh(eyeVAO, [root.pos[0]-0.045, root.pos[1]-0.10, root.pos[2]+0.155], null, [0.04,0.04,0.04], 0, 0, [1.20,1.20,1.20]);
   // enlarge the white highlight and pull it slightly back toward the pupil (but not inside)
-  drawMesh(eyeWhiteVAO, [-0.045, -0.10, 0.195], null, [0.98,0.98,0.98], 0, 0, [0.50,0.50,0.50]);
-  drawMesh(eyeVAO, [0.045, -0.10, 0.155], null, [0.04,0.04,0.04], 0, 0, [1.20,1.20,1.20]);
-  drawMesh(eyeWhiteVAO, [0.045, -0.10, 0.195], null, [0.98,0.98,0.98], 0, 0, [0.50,0.50,0.50]);
+  drawMesh(eyeWhiteVAO, [root.pos[0]-0.045, root.pos[1]-0.10, root.pos[2]+0.195], null, [0.98,0.98,0.98], 0, 0, [0.50,0.50,0.50]);
+  drawMesh(eyeVAO, [root.pos[0]+0.045, root.pos[1]-0.10, root.pos[2]+0.155], null, [0.04,0.04,0.04], 0, 0, [1.20,1.20,1.20]);
+  drawMesh(eyeWhiteVAO, [root.pos[0]+0.045, root.pos[1]-0.10, root.pos[2]+0.195], null, [0.98,0.98,0.98], 0, 0, [0.50,0.50,0.50]);
   // Wavy mouth: draw several small mouth bumps to approximate a wavy shape, lowered slightly
-  drawMesh(mouthVAO, [-0.045, -0.20, 0.175], [0.0,0.0,0.12], [0.78,0.38,0.46], 0, 0, [0.40,0.20,0.16]);
-  drawMesh(mouthVAO, [-0.015, -0.202, 0.176], [0.0,0.0,-0.10], [0.78,0.38,0.46], 0, 0, [0.36,0.18,0.14]);
-  drawMesh(mouthVAO, [0.015, -0.202, 0.176], [0.0,0.0,0.10], [0.78,0.38,0.46], 0, 0, [0.36,0.18,0.14]);
-  drawMesh(mouthVAO, [0.045, -0.20, 0.175], [0.0,0.0,-0.12], [0.78,0.38,0.46], 0, 0, [0.40,0.20,0.16]);
+  drawMesh(mouthVAO, [-0.045, -0.20, 0.21], [0.0,0.0,0.12], [0.78,0.38,0.46], 0, 0, [0.40,0.20,0.16]);
+  drawMesh(mouthVAO, [-0.015, -0.20, 0.21], [0.0,0.0,-0.10], [0.78,0.38,0.46], 0, 0, [0.36,0.18,0.14]);
+  drawMesh(mouthVAO, [0.015, -0.20, 0.21], [0.0,0.0,0.10], [0.78,0.38,0.46], 0, 0, [0.36,0.18,0.14]);
+  drawMesh(mouthVAO, [0.045, -0.20, 0.21], [0.0,0.0,-0.12], [0.78,0.38,0.46], 0, 0, [0.40,0.20,0.16]);
   }
-  
+  window.drawScene = drawScene;
+  // === Hierarchical Animation Handler ===
+function updateHierarchy(time) {
+  if (!window.SmolivNodes) return;
+  const N = window.SmolivNodes;
+
+  // Ambil root transform
+  const root = N.root;
+  const fruit = N.fruit;
+  const leaves = N.leaves;
+  const feet = N.feet;
+
+  // Matriks root
+  const rootMat = mat4.create();
+  mat4.translate(rootMat, rootMat, root.pos);
+  const rotAngle = Math.hypot(root.rot[0], root.rot[1], root.rot[2]);
+  if (rotAngle > 1e-4) {
+    const axis = [root.rot[0]/rotAngle, root.rot[1]/rotAngle, root.rot[2]/rotAngle];
+    mat4.rotate(rootMat, rootMat, rotAngle, axis);
+  }
+  mat4.scale(rootMat, rootMat, root.scale);
+
+  // Fruit
+  fruit.world = mat4.create();
+  mat4.copy(fruit.world, rootMat);
+  mat4.translate(fruit.world, fruit.world, [0.00, 0.26, 0.00]);
+
+  // Leaves mengikuti fruit
+  leaves.forEach((leaf, i) => {
+    leaf.world = mat4.create();
+    mat4.copy(leaf.world, fruit.world);
+    mat4.translate(leaf.world, leaf.world, leaf.pos);
+    if (leaf.rot) {
+      const a = Math.hypot(leaf.rot[0], leaf.rot[1], leaf.rot[2]);
+      if (a > 1e-4) {
+        const axis = [leaf.rot[1], leaf.rot[2], leaf.rot[3]];
+        mat4.rotate(leaf.world, leaf.world, a, axis);
+      }
+    }
+    mat4.scale(leaf.world, leaf.world, leaf.scale);
+  });
+
+  // Feet mengikuti root
+  feet.forEach((foot) => {
+    foot.world = mat4.create();
+    mat4.copy(foot.world, rootMat);
+    mat4.translate(foot.world, foot.world, foot.pos);
+    if (foot.rot) {
+      const a = Math.hypot(foot.rot[0], foot.rot[1], foot.rot[2]);
+      if (a > 1e-4) {
+        const axis = [foot.rot[1], foot.rot[2], foot.rot[3]];
+        mat4.rotate(foot.world, foot.world, a, axis);
+      }
+    }
+    mat4.scale(foot.world, foot.world, foot.scale);
+  });
+}
+
   function render(){
     resize();
     gl.clearColor(0.94,0.86,0.72,1);
     gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+    // Tambahan: panggil updateHierarchy agar transform diterapkan sebelum menggambar
+    if (typeof updateHierarchy === "function") {
+        updateHierarchy(performance.now());
+    }
+
     const aspect=canvas.width/canvas.height;
     const proj=mat4.create();
     mat4.perspective(proj,Math.PI/4,aspect,0.01,20);
@@ -567,4 +801,85 @@ function createVAOFromMesh(gl,program,mesh){
   } catch (err) {
     console.error('Runtime error in smoliv.js:', err);
   }
+window.addEventListener("load", () => {
+  setTimeout(() => {
+    if (typeof window.SmolivNodes === "undefined") {
+      console.warn("SmolivNodes belum siap, animasi dilewati.");
+      return;
+    }
+
+    const SmolivNodes = window.SmolivNodes;
+    let start = performance.now();
+
+    function easeInOutSine(x) {
+      return 0.5 - 0.5 * Math.cos(Math.PI * x);
+    }
+
+    function updateAnim(time) {
+      const t = (time - start) / 1000.0;
+      const cycle = t % 10.0;
+
+      // Reset
+      SmolivNodes.root.pos = [0, 0, 0];
+      SmolivNodes.root.scale = [1, 1, 1];
+      SmolivNodes.root.rot = [0, 1, 0, 0];
+
+      const walkOsc = Math.sin(t * 6.0) * 0.05;
+
+      // === 1. Jalan ke depan (0–3 s)
+      if (cycle < 3.0) {
+        const p = cycle / 3.0;
+        SmolivNodes.root.pos[0] = 0.6 * easeInOutSine(p);
+        SmolivNodes.feet[0].pos[1] = -0.36 + walkOsc;
+        SmolivNodes.feet[1].pos[1] = -0.36 - walkOsc;
+      }
+
+      // === 2. Lompat (3–4 s)
+      else if (cycle < 4.0) {
+        const p = (cycle - 3.0);
+        const y = Math.sin(p * Math.PI) * 0.5;
+        const s = 1.0 + Math.sin(p * Math.PI) * 0.3;
+        SmolivNodes.root.pos[0] = 0.6;
+        SmolivNodes.root.pos[1] = y;
+        SmolivNodes.root.scale = [1 / Math.sqrt(s), s, 1 / Math.sqrt(s)];
+      }
+
+      // === 3. Mendarat (4–5 s)
+      else if (cycle < 5.0) {
+        const p = (cycle - 4.0);
+        const squash = 1.0 + Math.sin(p * Math.PI) * 0.4;
+        SmolivNodes.root.pos = [0.6, 0, 0];
+        SmolivNodes.root.scale = [squash, 1 / squash, squash];
+      }
+
+      // === 4. Putar dan jalan balik (5–8 s)
+      else if (cycle < 8.0) {
+        const p = (cycle - 5.0) / 3.0;
+        const ang = Math.PI * p;
+        SmolivNodes.root.rot = [0, 1, 0, ang];
+        SmolivNodes.root.pos[0] = 0.6 * (1.0 - easeInOutSine(p));
+        SmolivNodes.feet[0].pos[1] = -0.36 + walkOsc;
+        SmolivNodes.feet[1].pos[1] = -0.36 - walkOsc;
+      }
+
+      // === 5. Lompat kedua (8–10 s)
+      else {
+        const p = (cycle - 8.0) / 2.0;
+        const y = Math.sin(p * Math.PI) * 0.5;
+        const s = 1.0 + Math.sin(p * Math.PI) * 0.3;
+        SmolivNodes.root.pos[1] = y;
+        SmolivNodes.root.scale = [1 / Math.sqrt(s), s, 1 / Math.sqrt(s)];
+      }
+    }
+
+    // function loop() {
+    //   updateAnim(performance.now());
+    //   requestAnimationFrame(loop);
+    // }
+
+    console.log("Animasi hierarkis Smoliv aktif (versi non-intrusif).");
+    loop();
+  }, 1000);
+});
+
 })();
