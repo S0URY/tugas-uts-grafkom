@@ -98,7 +98,17 @@
                 B*invDet, E*invDet, H*invDet,
                 C*invDet, F*invDet, I*invDet];
       },
-      transposeMat3(m){ return [m[0],m[3],m[6], m[1],m[4],m[7], m[2],m[5],m[8]]; }
+      transposeMat3(m){ return [m[0],m[3],m[6], m[1],m[4],m[7], m[2],m[5],m[8]]; },
+      RAxis(axis, a){
+        const [x, y, z] = norm(axis);
+        const c = Math.cos(a), s = Math.sin(a), t = 1 - c;
+        return [
+          t*x*x + c,   t*x*y - z*s, t*x*z + y*s, 0,
+          t*x*y + z*s, t*y*y + c,   t*y*z - x*s, 0,
+          t*x*z - y*s, t*y*z + x*s, t*z*z + c,   0,
+          0, 0, 0, 1
+        ];
+      }
     };
     function sub(a,b){return [a[0]-b[0],a[1]-b[1],a[2]-b[2]];}
     function cross(a,b){return [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]];}
@@ -301,7 +311,7 @@
     const map = Object.fromEntries(NODES.map(n=>[n.id,n]));
     function worldMatrixOf(node){
       const S = M.S(node.S[0],node.S[1],node.S[2]);
-      const R = M.mul(M.mul(M.Rz(node.R[2]||0), M.Ry(node.R[1]||0)), M.Rx(node.R[0]||0));
+      const R = node._customR ? node._customR : M.mul(M.mul(M.Rz(node.R[2]||0), M.Ry(node.R[1]||0)), M.Rx(node.R[0]||0));
       const T = M.T(node.T[0],node.T[1],node.T[2]);
       const local = M.mul(M.mul(T,R),S);
       if (!node.parent) return local;
@@ -387,11 +397,24 @@
           }
         }
 
-        // head hierarchical movement (nod)
         const head = map["H"];
         if (head) {
           if (!head._baseR) head._baseR = [...head.R];
-          head.R[0] = head._baseR[0] + Math.sin(t * 2) * 0.2;
+          if (!head._baseS) head._baseS = [...head.S];
+
+          const nodAngle = Math.sin(t * 2) * 0.2;    // up/down nod
+          const turnAngle = Math.sin(t * 1.5) * 0.5; // left/right turn
+
+          // --- Matrices ---
+          const nod = M.Rx(nodAngle);             // nod
+          const turn = M.RAxis([0,1,0], turnAngle); // turn around Y
+          const baseR = M.mul(
+              M.mul(M.Rz(head._baseR[2]), M.Ry(head._baseR[1])),
+              M.Rx(head._baseR[0])
+          );
+
+          // --- Combine: base * turn * nod ---
+          head._customR = M.mul(baseR, M.mul(turn, nod));
         }
         for (const n of NODES) {
           const mesh = MESH[n.prim];
